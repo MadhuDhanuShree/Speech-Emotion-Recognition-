@@ -1,0 +1,118 @@
+import os
+import glob
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+import librosa
+import soundfile
+
+# Define emotions mapping based on the RAVDESS dataset
+emotions = {
+    '01': 'neutral',
+    '02': 'calm',
+    '03': 'happy',
+    '04': 'sad',
+    '05': 'angry',
+    '06': 'fearful',
+    '07': 'disgust',
+    '08': 'surprised'
+}
+
+# Define the observed emotions (you can adjust this based on your needs)
+observed_emotions = ['calm', 'happy', 'fearful', 'disgust']
+
+# Function to extract features from audio file
+def extract_feature(file_name, mfcc=True, chroma=True, mel=True):
+    with soundfile.SoundFile(file_name) as sound_file:
+        X = sound_file.read(dtype="float32")
+        sample_rate = sound_file.samplerate
+        if chroma:
+            stft = np.abs(librosa.stft(X))
+        result = np.array([])
+        if mfcc:
+            mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T, axis=0)
+            result = np.hstack((result, mfccs))
+        if chroma:
+            chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T, axis=0)
+            result = np.hstack((result, chroma))
+        if mel:
+            mel_spec = np.mean(librosa.feature.melspectrogram(y=X, sr=sample_rate).T, axis=0)
+            result = np.hstack((result, mel_spec))
+    return result
+
+# Function to load and split data
+def load_data(test_size=0.2, random_state=None):
+    x, y = [], []
+    for file in glob.glob(r"C:\Users\USER\Downloads\speech-emotion-recognition-ravdess-data\Actor_\.wav"):
+        file_name = os.path.basename(file)
+        emotion = emotions[file_name.split("-")[2]]
+        if emotion not in observed_emotions:
+            continue
+        feature = extract_feature(file, mfcc=True, chroma=True, mel=True)
+        x.append(feature)
+        y.append(emotion)
+    return train_test_split(np.array(x), y, test_size=test_size, random_state=random_state)
+
+# Load and split the data
+x_train, x_test, y_train, y_test = load_data(test_size=0.25, random_state=42)
+
+# Perform feature scaling on training and test data
+scaler = StandardScaler()
+x_train_scaled = scaler.fit_transform(x_train)
+x_test_scaled = scaler.transform(x_test)
+
+# DataFlair - Get the shape of the training and testing datasets
+print((x_train.shape[0], x_test.shape[0]))
+
+# DataFlair - Get the number of features extracted
+print(f'Features extracted: {x_train.shape[1]}')
+
+# Initialize the Multi Layer Perceptron Classifier
+model = MLPClassifier(alpha=0.01, batch_size=256, epsilon=1e-08, hidden_layer_sizes=(300,),
+                      learning_rate='adaptive', max_iter=1000, random_state=42)
+
+# Train the model
+model.fit(x_train_scaled, y_train)
+
+# Predict for the test set
+y_pred = model.predict(x_test_scaled)
+
+accuracy_by_emotion = {emotion: 0.0 for emotion in observed_emotions}
+count_by_emotion = {emotion: 0 for emotion in observed_emotions}
+
+# Calculate accuracy for each emotion
+for true_label, pred_label in zip(y_test, y_pred):
+    if true_label in observed_emotions:
+        count_by_emotion[true_label] += 1
+        if true_label == pred_label:
+            accuracy_by_emotion[true_label] += 1
+
+# Compute total accuracy and accuracy for each emotion
+total_samples = len(y_test)
+total_correct = sum(accuracy_by_emotion.values())
+
+total_accuracy = total_correct / total_samples
+
+# Print accuracy for each emotion and total accuracy
+print("Accuracy by Emotion:")
+for emotion in observed_emotions:
+    if count_by_emotion[emotion] > 0:
+        emotion_accuracy = (accuracy_by_emotion[emotion] / count_by_emotion[emotion]) * 100
+        print(f"{emotion.capitalize()}: {emotion_accuracy:.2f}%")
+
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_true=y_test, y_pred=y_pred)
+print("Total aAccuracy: {:.2f}%".format(accuracy * 100))
+
+# Calculate precision and recall for each class
+precision = precision_score(y_true=y_test, y_pred=y_pred, average=None, labels=observed_emotions)
+recall = recall_score(y_true=y_test, y_pred=y_pred, average=None, labels=observed_emotions)
+
+# Print precision and recall for each class
+for emotion, prec, rec in zip(observed_emotions, precision, recall):
+    print(f"Emotion: {emotion}")
+    print(f"   Precision: {prec:.2f}")
+    print(f"   Recall: {rec:.2f}")
