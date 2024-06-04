@@ -1,0 +1,20 @@
+(576, 192)
+Features extracted: 180
+Accuracy by Emotion:
+Calm: 83.33%
+Happy: 75.00%
+Fearful: 72.34%
+Disgust: 79.07%
+Total aAccuracy: 77.60%
+Emotion: calm
+   Precision: 0.90
+   Recall: 0.83
+Emotion: happy
+   Precision: 0.72
+   Recall: 0.75
+Emotion: fearful
+   Precision: 0.72
+   Recall: 0.72
+Emotion: disgust
+   Precision: 0.76
+   Recall: 0.79
